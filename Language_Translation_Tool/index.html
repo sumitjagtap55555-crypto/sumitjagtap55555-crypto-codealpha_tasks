@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridge — Language Translator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#0E1B24;
+    --surface:#152634;
+    --surface-2:#1B3140;
+    --border:rgba(237,239,233,0.09);
+    --ink:#EDEFE9;
+    --muted:#83A0AA;
+    --source:#E8A33D;
+    --source-dim:rgba(232,163,61,0.14);
+    --target:#5FBFA1;
+    --target-dim:rgba(95,191,161,0.14);
+    --error:#E2645A;
+    --radius:14px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    padding:48px 20px 64px;
+    display:flex;
+    justify-content:center;
+  }
+
+  .wrap{ width:100%; max-width:980px; }
+
+  /* ---------- Header ---------- */
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:7px; height:7px;
+    border-radius:50%;
+    background:linear-gradient(90deg,var(--source),var(--target));
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:clamp(32px,5vw,46px);
+    margin:0 0 10px;
+    letter-spacing:-0.01em;
+  }
+  h1 em{
+    font-style:italic;
+    font-weight:400;
+    background:linear-gradient(90deg,var(--source),var(--target));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+  .sub{ color:var(--muted); font-size:15px; max-width:520px; line-height:1.5; margin-bottom:36px;}
+
+  /* ---------- Card ---------- */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+
+  .panels{
+    display:grid;
+    grid-template-columns:1fr 56px 1fr;
+    align-items:stretch;
+  }
+
+  .panel{ padding:22px 24px 18px; display:flex; flex-direction:column; min-height:300px;}
+  .panel.source{ border-top:3px solid var(--source); }
+  .panel.target{ border-top:3px solid var(--target); background:var(--surface-2);}
+
+  .panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .direction-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .panel.source .direction-label{ color:var(--source); }
+  .panel.target .direction-label{ color:var(--target); }
+
+  select{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--ink);
+    font-family:'Fraunces',serif;
+    font-size:18px;
+    padding:6px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    max-width:220px;
+  }
+  select:focus-visible{ outline:2px solid var(--source); outline-offset:2px; }
+  .panel.target select:focus-visible{ outline-color:var(--target); }
+
+  textarea{
+    flex:1;
+    width:100%;
+    resize:none;
+    background:transparent;
+    border:none;
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-size:17px;
+    line-height:1.55;
+    min-height:160px;
+    padding:6px 0;
+  }
+  textarea:focus-visible{ outline:none; }
+  textarea::placeholder{ color:var(--muted); }
+
+  .output{
+    flex:1;
+    min-height:160px;
+    font-family:'Inter',sans-serif;
+    font-size:17px;
+    line-height:1.55;
+    padding:6px 0;
+    color:var(--ink);
+    white-space:pre-wrap;
+  }
+  .output.placeholder{ color:var(--muted); }
+  .output.error-text{ color:var(--error); font-size:15px; }
+
+  .panel-foot{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--border);
+  }
+
+  .icon-btn{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--muted);
+    width:34px; height:34px;
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .icon-btn:hover{ color:var(--ink); border-color:var(--muted); }
+  .icon-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .icon-btn svg{ width:16px; height:16px; }
+  .icon-row{ display:flex; gap:8px; }
+
+  .char-count{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); }
+  .char-count.warn{ color:var(--source); }
+
+  .copy-btn.copied{ color:var(--target); border-color:var(--target); }
+
+  /* ---------- Seam ---------- */
+  .seam{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:
+      repeating-linear-gradient(to bottom, var(--border) 0 6px, transparent 6px 14px);
+    background-position:center;
+    background-size:1px 100%;
+    background-repeat:no-repeat;
+  }
+  .swap-btn{
+    width:38px; height:38px;
+    border-radius:50%;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition:transform .35s ease, border-color .2s;
+    z-index:2;
+  }
+  .swap-btn:hover{ border-color:var(--target); }
+  .swap-btn.spin{ transform:rotate(180deg); }
+  .swap-btn svg{ width:17px; height:17px; }
+
+  .seam-flow{
+    position:absolute;
+    top:0; left:50%;
+    width:1px; height:0%;
+    background:linear-gradient(to bottom, var(--source), var(--target));
+    transform:translateX(-50%);
+    opacity:0;
+    transition:opacity .2s;
+  }
+  .seam-flow.active{
+    opacity:1;
+    animation:flow 1.1s ease-in-out infinite;
+  }
+  @keyframes flow{
+    0%{ height:0%; top:0; }
+    50%{ height:55%; top:22%; }
+    100%{ height:0%; top:100%; }
+  }
+
+  /* ---------- Action row ---------- */
+  .actions{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:18px 24px;
+    border-top:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .translate-btn{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    color:#0E1B24;
+    background:linear-gradient(90deg,var(--source),var(--target));
+    border:none;
+    padding:11px 22px;
+    border-radius:9px;
+    cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+    transition:opacity .15s, transform .15s;
+  }
+  .translate-btn:hover{ opacity:0.92; }
+  .translate-btn:active{ transform:scale(0.98); }
+  .translate-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .translate-btn:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+
+  .hint{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted); }
+  .status{ font-size:13px; color:var(--muted); margin-left:auto; }
+  .status.error{ color:var(--error); }
+
+  .spinner{
+    width:14px; height:14px;
+    border:2px solid rgba(14,27,36,0.35);
+    border-top-color:#0E1B24;
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  footer{
+    margin-top:20px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  footer a{ color:var(--target); text-decoration:none; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width:760px){
+    .panels{ grid-template-columns:1fr; }
+    .seam{
+      background:repeating-linear-gradient(to right, var(--border) 0 6px, transparent 6px 14px);
+      background-position:center;
+      background-size:100% 1px;
+      background-repeat:no-repeat;
+      padding:10px 0;
+    }
+    .seam-flow{
+      top:50%; left:0; width:0%; height:1px;
+      background:linear-gradient(to right, var(--source), var(--target));
+      transform:translateY(-50%);
+    }
+    .seam-flow.active{ animation:flowH 1.1s ease-in-out infinite; }
+    @keyframes flowH{ 0%{width:0%;left:0;} 50%{width:55%;left:22%;} 100%{width:0%;left:100%;} }
+    .swap-btn{ transform:rotate(90deg); }
+    .swap-btn.spin{ transform:rotate(270deg); }
+    .status{ margin-left:0; }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .seam-flow, .swap-btn, .spinner{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Translation tool</div>
+  <h1>Say it in <em>any</em> language.</h1>
+  <p class="sub">Type or paste text, choose where it's coming from and where it's going, and translate it instantly. Listen back to either side, or copy the result with one click.</p>
+
+  <div class="card">
+    <div class="panels">
+
+      <!-- SOURCE -->
+      <div class="panel source">
+        <div class="panel-head">
+          <span class="direction-label">From</span>
+          <select id="sourceLang" aria-label="Source language"></select>
+        </div>
+        <textarea id="sourceText" maxlength="500" placeholder="Start typing here…" aria-label="Text to translate"></textarea>
+        <div class="panel-foot">
+          <span class="char-count" id="charCount">0 / 500</span>
+          <div class="icon-row">
+            <button class="icon-btn" id="speakSource" title="Listen to source text" aria-label="Listen to source text">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 8a5 5 0 0 1 0 8"/></svg>
+            </button>
+            <button class="icon-btn" id="clearSource" title="Clear text" aria-label="Clear text">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEAM -->
+      <div class="seam">
+        <div class="seam-flow" id="seamFlow"></div>
+        <button class="swap-btn" id="swapBtn" title="Swap languages" aria-label="Swap source and target languages">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h13l-3.5-3.5"/><path d="M17 17H4l3.5 3.5"/></svg>
+        </button>
+      </div>
+
+      <!-- TARGET -->
+      <div class="panel target">
+        <div class="panel-head">
+          <span class="direction-label">To</span>
+          <select id="targetLang" aria-label="Target language"></select>
+        </div>
+        <div class="output placeholder" id="outputText" aria-live="polite">Your translation will appear here.</div>
+        <div class="panel-foot">
+          <span></span>
+          <div class="icon-row">
+            <button class="icon-btn" id="speakTarget" title="Listen to translation" aria-label="Listen to translation" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 8a5 5 0 0 1 0 8"/></svg>
+            </button>
+            <button class="icon-btn copy-btn" id="copyBtn" title="Copy translation" aria-label="Copy translation" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="actions">
+      <button class="translate-btn" id="translateBtn">
+        <span id="btnLabel">Translate</span>
+      </button>
+      <span class="hint">⌘ / Ctrl + Enter</span>
+      <span class="status" id="statusLine"></span>
+    </div>
+  </div>
+
+  <footer>
+    Powered by the free MyMemory Translation API (demo use — anonymous requests are capped around 500 characters and ~5,000/day).
+    To swap in <a href="https://cloud.google.com/translate" target="_blank" rel="noopener">Google Cloud Translation</a> or
+    <a href="https://www.microsoft.com/translator" target="_blank" rel="noopener">Microsoft Translator</a> for production,
+    see the commented functions <code>translateWithGoogle()</code> / <code>translateWithAzure()</code> near the bottom of the script.
+  </footer>
+
+</div>
+
+<script>
+  // ---------------------------------------------------------------
+  // Language list: { code: MyMemory/ISO code, name, tts: speech locale }
+  // ---------------------------------------------------------------
+  const LANGUAGES = [
+    { code:'en',    name:'English',               tts:'en-US' },
+    { code:'es',    name:'Spanish',                tts:'es-ES' },
+    { code:'fr',    name:'French',                 tts:'fr-FR' },
+    { code:'de',    name:'German',                 tts:'de-DE' },
+    { code:'it',    name:'Italian',                tts:'it-IT' },
+    { code:'pt',    name:'Portuguese',              tts:'pt-PT' },
+    { code:'ru',    name:'Russian',                 tts:'ru-RU' },
+    { code:'zh-CN', name:'Chinese (Simplified)',    tts:'zh-CN' },
+    { code:'ja',    name:'Japanese',                tts:'ja-JP' },
+    { code:'ko',    name:'Korean',                  tts:'ko-KR' },
+    { code:'ar',    name:'Arabic',                  tts:'ar-SA' },
+    { code:'hi',    name:'Hindi',                   tts:'hi-IN' },
+    { code:'mr',    name:'Marathi',                 tts:'mr-IN' },
+    { code:'nl',    name:'Dutch',                   tts:'nl-NL' },
+    { code:'tr',    name:'Turkish',                 tts:'tr-TR' },
+    { code:'vi',    name:'Vietnamese',              tts:'vi-VN' },
+    { code:'pl',    name:'Polish',                  tts:'pl-PL' },
+    { code:'sv',    name:'Swedish',                 tts:'sv-SE' },
+    { code:'el',    name:'Greek',                   tts:'el-GR' },
+    { code:'he',    name:'Hebrew',                  tts:'he-IL' },
+    { code:'th',    name:'Thai',                    tts:'th-TH' },
+    { code:'id',    name:'Indonesian',              tts:'id-ID' },
+    { code:'uk',    name:'Ukrainian',                tts:'uk-UA' },
+  ];
+
+  const sourceSel  = document.getElementById('sourceLang');
+  const targetSel  = document.getElementById('targetLang');
+  const sourceText = document.getElementById('sourceText');
+  const outputText = document.getElementById('outputText');
+  const charCount   = document.getElementById('charCount');
+  const translateBtn= document.getElementById('translateBtn');
+  const btnLabel     = document.getElementById('btnLabel');
+  const statusLine   = document.getElementById('statusLine');
+  const swapBtn       = document.getElementById('swapBtn');
+  const seamFlow       = document.getElementById('seamFlow');
+  const speakSourceBtn  = document.getElementById('speakSource');
+  const speakTargetBtn  = document.getElementById('speakTarget');
+  const copyBtn          = document.getElementById('copyBtn');
+  const clearBtn          = document.getElementById('clearSource');
+
+  let lastTranslation = '';
+  let isTranslating = false;
+
+  function populateSelects(){
+    LANGUAGES.forEach(l=>{
+      const o1 = document.createElement('option'); o1.value=l.code; o1.textContent=l.name;
+      const o2 = document.createElement('option'); o2.value=l.code; o2.textContent=l.name;
+      sourceSel.appendChild(o1);
+      targetSel.appendChild(o2);
+    });
+    sourceSel.value = 'en';
+    targetSel.value = 'hi';
+  }
+  populateSelects();
+
+  function langByCode(code){ return LANGUAGES.find(l=>l.code===code); }
+
+  function updateCharCount(){
+    const len = sourceText.value.length;
+    charCount.textContent = `${len} / 500`;
+    charCount.classList.toggle('warn', len > 440);
+  }
+  sourceText.addEventListener('input', updateCharCount);
+
+  sourceText.addEventListener('keydown', (e)=>{
+    if((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); runTranslate(); }
+  });
+
+  // ---------------------------------------------------------------
+  // Translation call — MyMemory (no API key needed, fine for demos)
+  // ---------------------------------------------------------------
+  async function translateWithMyMemory(text, sourceCode, targetCode){
+    const langpair = `${sourceCode}|${targetCode}`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langpair}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Network error reaching the translation service.');
+    const data = await res.json();
+    const translated = data?.responseData?.translatedText;
+    if(!translated || /MYMEMORY WARNING/i.test(translated)){
+      throw new Error(data?.responseDetails || 'Translation limit reached — try again in a moment.');
+    }
+    return translated;
+  }
+
+  // -----------------------------------------------------------------
+  // Alternative providers (commented out). Drop in your own API key
+  // and call these instead of translateWithMyMemory() if you want to
+  // use a production-grade service. Both typically need a small server
+  // proxy in real apps, since calling them directly from the browser
+  // exposes your key in client-side code.
+  // -----------------------------------------------------------------
+  //
+  // async function translateWithGoogle(text, sourceCode, targetCode){
+  //   const API_KEY = 'YOUR_GOOGLE_API_KEY';
+  //   const res = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${API_KEY}`, {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({ q: text, source: sourceCode, target: targetCode, format: 'text' })
+  //   });
+  //   const data = await res.json();
+  //   return data.data.translations[0].translatedText;
+  // }
+  //
+  // async function translateWithAzure(text, sourceCode, targetCode){
+  //   const API_KEY = 'YOUR_AZURE_KEY';
+  //   const REGION  = 'YOUR_AZURE_REGION';
+  //   const res = await fetch(`https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=${sourceCode}&to=${targetCode}`, {
+  //     method: 'POST',
+  //     headers: {
+  //       'Ocp-Apim-Subscription-Key': API_KEY,
+  //       'Ocp-Apim-Subscription-Region': REGION,
+  //       'Content-Type': 'application/json'
+  //     },
+  //     body: JSON.stringify([{ Text: text }])
+  //   });
+  //   const data = await res.json();
+  //   return data[0].translations[0].text;
+  // }
+
+  async function runTranslate(){
+    const text = sourceText.value.trim();
+    if(!text){ sourceText.focus(); return; }
+    if(isTranslating) return;
+
+    isTranslating = true;
+    translateBtn.disabled = true;
+    btnLabel.innerHTML = '<span class="spinner"></span> Translating';
+    seamFlow.classList.add('active');
+    statusLine.textContent = '';
+    statusLine.classList.remove('error');
+    outputText.classList.remove('error-text');
+
+    try{
+      const translated = await translateWithMyMemory(text, sourceSel.value, targetSel.value);
+      lastTranslation = translated;
+      outputText.textContent = translated;
+      outputText.classList.remove('placeholder');
+      speakTargetBtn.disabled = false;
+      copyBtn.disabled = false;
+      statusLine.textContent = 'Done.';
+    }catch(err){
+      outputText.textContent = err.message || 'Something went wrong. Please try again.';
+      outputText.classList.add('error-text');
+      outputText.classList.remove('placeholder');
+      speakTargetBtn.disabled = true;
+      copyBtn.disabled = true;
+      lastTranslation = '';
+      statusLine.textContent = 'Translation failed.';
+      statusLine.classList.add('error');
+    }finally{
+      isTranslating = false;
+      translateBtn.disabled = false;
+      btnLabel.textContent = 'Translate';
+      seamFlow.classList.remove('active');
+    }
+  }
+  translateBtn.addEventListener('click', runTranslate);
+
+  // ---------------------------------------------------------------
+  // Swap languages (and content, if a translation already exists)
+  // ---------------------------------------------------------------
+  swapBtn.addEventListener('click', ()=>{
+    swapBtn.classList.add('spin');
+    setTimeout(()=>swapBtn.classList.remove('spin'), 350);
+
+    const s = sourceSel.value, t = targetSel.value;
+    sourceSel.value = t; targetSel.value = s;
+
+    if(lastTranslation){
+      const newSourceText = lastTranslation;
+      sourceText.value = newSourceText;
+      updateCharCount();
+      outputText.textContent = 'Your translation will appear here.';
+      outputText.classList.add('placeholder');
+      outputText.classList.remove('error-text');
+      lastTranslation = '';
+      speakTargetBtn.disabled = true;
+      copyBtn.disabled = true;
+    }
+  });
+
+  // ---------------------------------------------------------------
+  // Clear
+  // ---------------------------------------------------------------
+  clearBtn.addEventListener('click', ()=>{
+    sourceText.value = '';
+    updateCharCount();
+    outputText.textContent = 'Your translation will appear here.';
+    outputText.classList.add('placeholder');
+    outputText.classList.remove('error-text');
+    lastTranslation = '';
+    speakTargetBtn.disabled = true;
+    copyBtn.disabled = true;
+    statusLine.textContent = '';
+    statusLine.classList.remove('error');
+    sourceText.focus();
+  });
+
+  // ---------------------------------------------------------------
+  // Copy translated text
+  // ---------------------------------------------------------------
+  copyBtn.addEventListener('click', async ()=>{
+    if(!lastTranslation) return;
+    try{
+      await navigator.clipboard.writeText(lastTranslation);
+      copyBtn.classList.add('copied');
+      setTimeout(()=>copyBtn.classList.remove('copied'), 1200);
+    }catch{
+      statusLine.textContent = 'Could not copy — select and copy manually.';
+      statusLine.classList.add('error');
+    }
+  });
+
+  // ---------------------------------------------------------------
+  // Text-to-speech (Web Speech API — no key required)
+  // ---------------------------------------------------------------
+  function speak(text, langCode){
+    if(!('speechSynthesis' in window) || !text) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    const lang = langByCode(langCode);
+    utter.lang = lang ? lang.tts : 'en-US';
+    window.speechSynthesis.speak(utter);
+  }
+  speakSourceBtn.addEventListener('click', ()=> speak(sourceText.value.trim(), sourceSel.value));
+  speakTargetBtn.addEventListener('click', ()=> speak(lastTranslation, targetSel.value));
+
+  updateCharCount();
+</script>
+</body>
+</html>
