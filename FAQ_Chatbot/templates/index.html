@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ Assistant</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#1A1820;
+    --panel:#211F29;
+    --bubble-bot:#2A2733;
+    --bubble-user-1:#6E5BFF;
+    --bubble-user-2:#8B7CFF;
+    --accent:#6E5BFF;
+    --text:#EDEAF2;
+    --muted:#8E8A9C;
+    --border:rgba(237,234,242,0.08);
+    --high:#4ED8A0;
+    --med:#F2B84B;
+    --low:#FF6E6E;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, rgba(110,91,255,0.18), transparent 45%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:36px 18px;
+  }
+
+  .app{
+    width:100%;
+    max-width:640px;
+    display:flex;
+    flex-direction:column;
+    height:calc(100vh - 72px);
+    min-height:560px;
+  }
+
+  /* ---------- Header ---------- */
+  header{ margin-bottom:18px; }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .eyebrow .dot-label{ display:flex; align-items:center; gap:9px; }
+  .eyebrow .dot-label::before{
+    content:"";
+    width:7px; height:7px;
+    border-radius:50%;
+    background:var(--high);
+    box-shadow:0 0 0 3px rgba(78,216,160,0.15);
+  }
+  h1{
+    font-family:'Sora',sans-serif;
+    font-weight:600;
+    font-size:26px;
+    margin:10px 0 0;
+    letter-spacing:-0.01em;
+  }
+
+  /* ---------- Suggestion chips ---------- */
+  .chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:16px 0 0;
+  }
+  .chip{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    letter-spacing:0.02em;
+    color:var(--muted);
+    background:var(--panel);
+    border:1px solid var(--border);
+    padding:7px 12px;
+    border-radius:100px;
+    cursor:pointer;
+    transition:border-color .15s, color .15s;
+  }
+  .chip:hover{ border-color:var(--accent); color:var(--text); }
+
+  /* ---------- Chat panel ---------- */
+  .chat-panel{
+    flex:1;
+    margin-top:18px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  .messages{
+    flex:1;
+    overflow-y:auto;
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .messages::-webkit-scrollbar{ width:8px; }
+  .messages::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+
+  .row{ display:flex; }
+  .row.user{ justify-content:flex-end; }
+  .row.bot{ justify-content:flex-start; }
+
+  .bubble{
+    max-width:80%;
+    padding:12px 15px;
+    border-radius:14px;
+    font-size:15px;
+    line-height:1.5;
+  }
+  .row.bot .bubble{
+    background:var(--bubble-bot);
+    border-top-left-radius:4px;
+  }
+  .row.user .bubble{
+    background:linear-gradient(135deg, var(--bubble-user-1), var(--bubble-user-2));
+    color:#fff;
+    border-top-right-radius:4px;
+  }
+
+  .meta{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:7px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+  .meta .match-q{
+    font-style:italic;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    max-width:230px;
+  }
+  .confidence{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:2px 8px;
+    border-radius:100px;
+    font-weight:500;
+    flex-shrink:0;
+  }
+  .confidence::before{ content:""; width:6px; height:6px; border-radius:50%; }
+  .confidence.high{ color:var(--high); background:rgba(78,216,160,0.12); }
+  .confidence.high::before{ background:var(--high); }
+  .confidence.med{ color:var(--med); background:rgba(242,184,75,0.12); }
+  .confidence.med::before{ background:var(--med); }
+  .confidence.low{ color:var(--low); background:rgba(255,110,110,0.12); }
+  .confidence.low::before{ background:var(--low); }
+
+  .typing{ display:flex; gap:4px; padding:6px 2px; }
+  .typing span{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--muted);
+    animation:bounce 1.1s infinite ease-in-out;
+  }
+  .typing span:nth-child(2){ animation-delay:.15s; }
+  .typing span:nth-child(3){ animation-delay:.3s; }
+  @keyframes bounce{ 0%,80%,100%{ transform:translateY(0); opacity:.4; } 40%{ transform:translateY(-4px); opacity:1; } }
+
+  /* ---------- Input bar ---------- */
+  .input-bar{
+    display:flex;
+    gap:10px;
+    padding:14px;
+    border-top:1px solid var(--border);
+  }
+  .input-bar input{
+    flex:1;
+    background:var(--bg);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    padding:11px 14px;
+    border-radius:10px;
+  }
+  .input-bar input:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .input-bar input::placeholder{ color:var(--muted); }
+
+  .send-btn{
+    background:linear-gradient(135deg, var(--bubble-user-1), var(--bubble-user-2));
+    border:none;
+    color:#fff;
+    width:44px; height:44px;
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+    transition:opacity .15s, transform .15s;
+  }
+  .send-btn:hover{ opacity:0.9; }
+  .send-btn:active{ transform:scale(0.95); }
+  .send-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .send-btn svg{ width:18px; height:18px; }
+
+  footer{
+    margin-top:14px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .typing span{ animation:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="eyebrow">
+      <span class="dot-label">Faq assistant · online</span>
+      <span>{{ faq_count }} answers · {{ categories|length }} topics</span>
+    </div>
+    <h1>Ask me anything about your order.</h1>
+    <div class="chips" id="chips">
+      {% for s in suggestions %}
+      <button class="chip" data-question="{{ s.question }}">{{ s.category }}</button>
+      {% endfor %}
+    </div>
+  </header>
+
+  <div class="chat-panel">
+    <div class="messages" id="messages">
+      <div class="row bot">
+        <div class="bubble">Hi! I can answer questions about orders, shipping, returns, payments, your account, warranty, support, and promotions. What do you need help with?</div>
+      </div>
+    </div>
+    <div class="input-bar">
+      <input type="text" id="userInput" placeholder="Type your question…" autocomplete="off" aria-label="Type your question">
+      <button class="send-btn" id="sendBtn" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <footer>Matches are found with TF-IDF + cosine similarity over a fixed FAQ set — not a live LLM.</footer>
+</div>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const chips = document.querySelectorAll('.chip');
+
+  function scrollToBottom(){
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function addUserMessage(text){
+    const row = document.createElement('div');
+    row.className = 'row user';
+    row.innerHTML = `<div class="bubble"></div>`;
+    row.querySelector('.bubble').textContent = text;
+    messagesEl.appendChild(row);
+    scrollToBottom();
+  }
+
+  function addTypingIndicator(){
+    const row = document.createElement('div');
+    row.className = 'row bot';
+    row.id = 'typingRow';
+    row.innerHTML = `<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+    messagesEl.appendChild(row);
+    scrollToBottom();
+  }
+
+  function removeTypingIndicator(){
+    const row = document.getElementById('typingRow');
+    if(row) row.remove();
+  }
+
+  function confidenceLabel(score){
+    if(score >= 0.6) return { cls: 'high', label: 'high confidence' };
+    if(score >= 0.35) return { cls: 'med', label: 'medium confidence' };
+    return { cls: 'low', label: 'low confidence' };
+  }
+
+  function addBotMessage(result){
+    const row = document.createElement('div');
+    row.className = 'row bot';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = result.answer;
+    row.appendChild(bubble);
+
+    if(result.type === 'faq'){
+      const { cls, label } = confidenceLabel(result.score);
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `
+        <span class="confidence ${cls}">${Math.round(result.score * 100)}% · ${label}</span>
+        <span class="match-q">matched: "${result.question}"</span>
+      `;
+      bubble.after(meta);
+    }
+    messagesEl.appendChild(row);
+    scrollToBottom();
+  }
+
+  async function sendMessage(text){
+    const trimmed = text.trim();
+    if(!trimmed) return;
+    addUserMessage(trimmed);
+    inputEl.value = '';
+    sendBtn.disabled = true;
+    addTypingIndicator();
+
+    try{
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: trimmed })
+      });
+      const data = await res.json();
+      removeTypingIndicator();
+      if(!res.ok){
+        addBotMessage({ matched:false, answer: data.error || 'Something went wrong.' });
+      }else{
+        addBotMessage(data);
+      }
+    }catch(err){
+      removeTypingIndicator();
+      addBotMessage({ matched:false, answer: "I couldn't reach the server. Is app.py still running?" });
+    }finally{
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', () => sendMessage(inputEl.value));
+  inputEl.addEventListener('keydown', (e) => { if(e.key === 'Enter') sendMessage(inputEl.value); });
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => sendMessage(chip.dataset.question));
+  });
+
+  inputEl.focus();
+</script>
+</body>
+</html>
